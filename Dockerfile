@@ -1,8 +1,8 @@
-ARG CUDA_VERSION=13.0
+ARG CUDA_VERSION=13.0.2
 ARG PYTORCH_VERSION=2.9.1
 ARG CUDNN_VERSION=9
 
-FROM pytorch/pytorch:${PYTORCH_VERSION}-cuda${CUDA_VERSION}-cudnn${CUDNN_VERSION}-devel AS builder
+FROM nvcr.io/nvidia/cuda:${CUDA_VERSION}-cudnn-devel-ubuntu24.04 AS builder
 
 # ----------------------------------------------------------
 # ---- Install dependencies with apt -----------------------
@@ -20,10 +20,9 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         # for ROS install
         software-properties-common \
-        ros-humble-desktop python3-colcon-common-extensions \
-        python3-rosdep \
+        ros-jazzy-desktop ros-dev-tools \
         # for dependency(copy from official dockerfile)
-        libgl1 libgl1-mesa-glx libglu1-mesa libegl-dev libegl1 \
+        libgl1 libglu1-mesa libegl-dev libegl1 \
         libxrender1 libglib2.0-0 ffmpeg libgtk2.0-dev \
         pkg-config libvulkan-dev libgles2 libglvnd0 libglx0 \
     ## rosdep initialize
@@ -35,7 +34,9 @@ RUN apt-get update \
 
 # ----------------------------------------------------------
 # ---- Install Genesis -------------------------------------
-RUN pip install --no-cache-dir open3d PyOpenGL==3.1.5 \
+RUN export PIP_NO_CACHE_DIR=1 \
+    && pip install open3d PyOpenGL==3.1.5 \
+    && pip install torch==2.9.1 torchvision==0.24.1 torchaudio==2.9.1 --index-url https://download.pytorch.org/whl/cu130 \
     && git clone https://github.com/Genesis-Embodied-AI/Genesis.git /tmp/Genesis \
-    && pip install --no-cache-dir /tmp/Genesis \
+    && pip install /tmp/Genesis \
     && rm -rf /tmp/Genesis

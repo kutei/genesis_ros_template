@@ -34,6 +34,8 @@ RUN apt-get update \
         pkg-config libvulkan-dev libgles2 libglvnd0 libglx0 \
         # for installing genesis
         python3-pip \
+        # for docker utility
+        gosu \
     ## rosdep initialize
     && rosdep init && rosdep update \
     ## clean up
@@ -85,10 +87,25 @@ RUN mv /home/ubuntu /home/${USER_NAME} \
 
 # ----------------------------------------------------------
 # ---- Create workspace structure --------------------------
+WORKDIR /workspace
 RUN mkdir -p /workspace  \
     && cd /workspace \
     && mkdir build install src \
     && chown -R ${USER_NAME}:${GROUP_NAME} /workspace
 
-USER ${USER_NAME}
-WORKDIR /workspace
+
+# ----------------------------------------------------------
+# ---- set entrypoint script -------------------------------
+RUN echo "#!/bin/bash\n\
+\n\
+chown ${USER_NAME}:${GROUP_NAME} -R /workspace\n\
+\n\
+if [ \$# -eq 0 ]; then\n\
+    exec gosu ${USER_NAME} /bin/bash\n\
+else\n\
+    exec gosu ${USER_NAME} \"\$@\"\n\
+fi" > /entrypoint.sh \
+    && chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["/bin/bash"]

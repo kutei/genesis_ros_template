@@ -6,6 +6,11 @@ ARG GROUP_ID
 
 FROM nvcr.io/nvidia/cuda:${CUDA_VERSION}-cudnn-devel-ubuntu24.04 AS builder
 
+ARG USER_NAME
+ARG GROUP_NAME
+ARG USER_ID
+ARG GROUP_ID
+
 # ----------------------------------------------------------
 # ---- Install dependencies with apt -----------------------
 ENV DEBIAN_FRONTEND=noninteractive
@@ -37,22 +42,12 @@ RUN apt-get update \
 
 
 # ----------------------------------------------------------
-# ---- Create a non-root user ------------------------------
-# ubuntu(uid=1000) user exists in the base image. But uid may
-# conflict with the host user id. So, we delete the ubuntu user.
-RUN userdel -r ubuntu || true \
-    && groupdel ubuntu || true \
-    && groupadd --gid ${GROUP_ID} ${GROUP_NAME} \
-    && useradd --shell /bin/bash -u ${USER_ID} -g ${GROUP_ID} -m ${USER_NAME}
-
-
-# ----------------------------------------------------------
 # ---- Install Genesis -------------------------------------
 ENV PIP_NO_CACHE_DIR=1 \
     PIP_BREAK_SYSTEM_PACKAGES=1
 
-USER ${USER_NAME}
-COPY --chown=${USER_NAME}:${GROUP_NAME} libs/Genesis /tmp/Genesis
+USER ubuntu
+COPY --chown=ubuntu:ubuntu libs/Genesis /tmp/Genesis
 RUN pip install torch==2.9.1 torchvision==0.24.1 torchaudio==2.9.1 --index-url https://download.pytorch.org/whl/cu130 \
     && pip install PyOpenGL==3.1.5 \
     && pip install /tmp/Genesis \
@@ -74,6 +69,18 @@ RUN apt-get update \
 COPY libs/Genesis/docker/10_nvidia.json /usr/share/glvnd/egl_vendor.d/10_nvidia.json
 COPY libs/Genesis/docker/nvidia_icd.json /usr/share/vulkan/icd.d/nvidia_icd.json
 COPY libs/Genesis/docker/nvidia_layers.json /etc/vulkan/implicit_layer.d/nvidia_layers.json
+
+
+# ----------------------------------------------------------
+# ---- Create a non-root user ------------------------------
+# Delete the configured ubuntu user and take over with
+# the host OS's UID/GID.
+RUN mv /home/ubuntu /home/${USER_NAME} \
+    && userdel ubuntu || true \
+    && groupdel ubuntu || true \
+    && groupadd --gid ${GROUP_ID} ${GROUP_NAME} \
+    && useradd --shell /bin/bash -u ${USER_ID} -g ${GROUP_ID} -m ${USER_NAME} \
+    && chown -R ${USER_NAME}:${GROUP_NAME} /home/${USER_NAME}
 
 
 # ----------------------------------------------------------

@@ -1,0 +1,6 @@
+[submodule "libs/genesis_ros"]
+	path = libs/genesis_ros
+	url = https://github.com/vybhav-ibr/genesis_ros.git
+[submodule "libs/Genesis"]
+	path = libs/Genesis
+	url = https://github.com/Genesis-Embodied-AI/Genesis.git

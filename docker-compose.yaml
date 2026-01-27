@@ -1,0 +1,26 @@
+services:
+  genesis_ros:
+    build:
+      context: .
+      args:
+        USER_ID: ${USER_ID}
+        GROUP_ID: ${GROUP_ID}
+    environment:
+      - DISPLAY=${DISPLAY}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    volumes:
+      - ./build:/workspace/build
+      - ./install:/workspace/install
+      - ./log:/workspace/log
+      - ./src:/workspace/src/pkgs
+      - ./libs/genesis_ros:/workspace/src/genesis_ros
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - /dev/dri:/dev/dri
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [compute, utility, graphics, display, video]

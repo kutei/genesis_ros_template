@@ -11,10 +11,12 @@ This is a template repository for Genesis simulator integrated with ROS2.
 
 - start docker container
     ```bash
+    xhost +
     ./scripts/run.bash
     ```
     or you can pass the command
     ```bash
+    xhost +
     ./scripts/run.bash colcon build
     ```
 

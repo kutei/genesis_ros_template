@@ -2,7 +2,7 @@
 
 This is a template repository for Genesis simulator integrated with ROS2.
 
-## how to use
+## How to Use
 
 - build docker image
     ```bash

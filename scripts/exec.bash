@@ -5,6 +5,9 @@ repo_dir=$(readlink -f $(dirname $0)/..)
 # load configs
 source $repo_dir/scripts/config.bash
 
+# allow connections to X server
+xhost +
+
 # run Docker image
 if [ $# -eq 0 ]; then
     docker compose \

@@ -15,6 +15,7 @@ services:
       - ./log:/workspace/log
       - ./src:/workspace/src/pkgs
       - ./libs/genesis_ros:/workspace/src/genesis_ros
+      - ./.cache/.bash_history:/home/genesis/.bash_history
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - /dev/dri:/dev/dri
     deploy:

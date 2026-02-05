@@ -4,14 +4,12 @@ ARG GROUP_NAME=genesis
 ARG USER_ID
 ARG GROUP_ID
 
-FROM nvcr.io/nvidia/cuda:${CUDA_VERSION}-cudnn-devel-ubuntu24.04 AS builder
 
-ARG USER_NAME
-ARG GROUP_NAME
-ARG USER_ID
-ARG GROUP_ID
+############################################################
+# Stage For Runtime Image
+############################################################
+FROM nvcr.io/nvidia/cuda:${CUDA_VERSION}-cudnn-devel-ubuntu24.04 AS base
 
-# ----------------------------------------------------------
 # ---- Install dependencies with apt -----------------------
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
@@ -42,22 +40,78 @@ RUN apt-get update \
     && apt clean \
     && rm -rf /var/lib/apt/lists/*
 
+# ---- Install Pytorch -------------------------------------
+ENV PIP_NO_CACHE_DIR=1 \
+    PIP_BREAK_SYSTEM_PACKAGES=1
+USER ubuntu
+RUN pip install torch==2.9.1 torchvision==0.24.1 torchaudio==2.9.1 --index-url https://download.pytorch.org/whl/cu130
+USER root
 
-# ----------------------------------------------------------
+
+############################################################
+# Stage For Builder Image
+############################################################
+FROM base AS builder
+
+# ---- Install build tools ---------------------------------
+RUN add-apt-repository ppa:ubuntu-toolchain-r/test \
+    && apt update \
+    && apt install -y --no-install-recommends \
+        gcc-11 g++-11 patchelf \
+    && apt clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# ---- prepare building ------------------------------------
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 110 \
+    && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 110 \
+    && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
+    && pip install "pybind11[global]" \
+    # Install CMake
+    && wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc \
+        | gpg --dearmor -o /usr/share/keyrings/kitware-archive-keyring.gpg \
+    && echo -e \
+        "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg]" \
+        "https://apt.kitware.com/ubuntu/ $(lsb_release -cs) main" \
+        "\n" \
+        "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg]" \
+        "https://apt.kitware.com/ubuntu/ $(lsb_release -cs) main" \
+        > /etc/apt/sources.list.d/kitware.list \
+    && apt update \
+    && apt-get install -y cmake \
+    && apt clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# ---- Build LuisaRender -----------------------------------
+COPY --chown=ubuntu:ubuntu libs/Genesis /Genesis
+RUN cd /Genesis \
+    && sh ./scripts/build_luisa.sh $(python3 -V | cut -d" " -f2 | cut -d. -f1-2)
+
+
+############################################################
+# Stage For Runtime Image
+############################################################
+FROM base AS runtime
+
+ARG USER_NAME
+ARG GROUP_NAME
+ARG USER_ID
+ARG GROUP_ID
+
 # ---- Install Genesis -------------------------------------
 ENV PIP_NO_CACHE_DIR=1 \
     PIP_BREAK_SYSTEM_PACKAGES=1
 
 USER ubuntu
 COPY --chown=ubuntu:ubuntu libs/Genesis /tmp/Genesis
-RUN pip install torch==2.9.1 torchvision==0.24.1 torchaudio==2.9.1 --index-url https://download.pytorch.org/whl/cu130 \
-    && pip install PyOpenGL==3.1.5 \
+RUN pip install PyOpenGL==3.1.5 \
     && pip install /tmp/Genesis \
     && pip install open3d numpy==1.26.4 \
     && rm -rf /tmp/Genesis
 
+# ---- Install Genesis dependencies ------------------------
+COPY --from=builder /Genesis/genesis/ext/ParticleMesher/ParticleMesherPy /home/genesis/.local/lib/python3.12/site-packages/genesis/ext/ParticleMesher/ParticleMesherPy
+COPY --from=builder /Genesis/genesis/ext/LuisaRender/build/bin /home/genesis/.local/lib/python3.12/site-packages/genesis/ext/LuisaRender/build/bin
 
-# ----------------------------------------------------------
 # ---- Setup ROS dependencies ------------------------------
 USER root
 COPY libs/genesis_ros /tmp/genesis_ros
@@ -72,8 +126,6 @@ COPY libs/Genesis/docker/10_nvidia.json /usr/share/glvnd/egl_vendor.d/10_nvidia.
 COPY libs/Genesis/docker/nvidia_icd.json /usr/share/vulkan/icd.d/nvidia_icd.json
 COPY libs/Genesis/docker/nvidia_layers.json /etc/vulkan/implicit_layer.d/nvidia_layers.json
 
-
-# ----------------------------------------------------------
 # ---- Create a non-root user ------------------------------
 # Delete the configured ubuntu user and take over with
 # the host OS's UID/GID.
@@ -84,8 +136,6 @@ RUN mv /home/ubuntu /home/${USER_NAME} \
     && useradd --shell /bin/bash -u ${USER_ID} -g ${GROUP_ID} -m ${USER_NAME} \
     && chown -R ${USER_NAME}:${GROUP_NAME} /home/${USER_NAME}
 
-
-# ----------------------------------------------------------
 # ---- Create workspace structure --------------------------
 WORKDIR /workspace
 RUN mkdir -p /workspace  \
@@ -93,8 +143,6 @@ RUN mkdir -p /workspace  \
     && mkdir build install src \
     && chown -R ${USER_NAME}:${GROUP_NAME} /workspace
 
-
-# ----------------------------------------------------------
 # ---- set entrypoint script -------------------------------
 RUN echo "#!/bin/bash\n\
 \n\

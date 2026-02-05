@@ -5,6 +5,7 @@ services:
       args:
         USER_ID: ${USER_ID}
         GROUP_ID: ${GROUP_ID}
+      target: runtime
     environment:
       - DISPLAY=${DISPLAY}
       - NVIDIA_VISIBLE_DEVICES=all

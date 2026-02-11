@@ -44,7 +44,8 @@ RUN apt-get update \
 ENV PIP_NO_CACHE_DIR=1 \
     PIP_BREAK_SYSTEM_PACKAGES=1
 USER ubuntu
-RUN pip install torch==2.9.1 torchvision==0.24.1 torchaudio==2.9.1 --index-url https://download.pytorch.org/whl/cu130
+RUN pip install torch==2.9.1 torchvision==0.24.1 torchaudio==2.9.1 --index-url https://download.pytorch.org/whl/cu130 \
+    && pip install nvidia-libnvcomp-cu13 nvidia-nvcomp-cu13
 USER root
 
 
@@ -66,25 +67,24 @@ RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 110 \
     && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 110 \
     && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
     && pip install "pybind11[global]" \
-    # Install CMake
+    # Install CMake (3.x.x version for luisa build)
     && wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc \
         | gpg --dearmor -o /usr/share/keyrings/kitware-archive-keyring.gpg \
-    && echo -e \
-        "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg]" \
-        "https://apt.kitware.com/ubuntu/ $(lsb_release -cs) main" \
-        "\n" \
-        "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg]" \
+    && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg]" \
         "https://apt.kitware.com/ubuntu/ $(lsb_release -cs) main" \
         > /etc/apt/sources.list.d/kitware.list \
+    && printf "Package: cmake cmake-data cmake-doc\nPin: version 3.*\nPin-Priority: 1001\n" \
+        > /etc/apt/preferences.d/cmake-3x \
     && apt update \
     && apt-get install -y cmake \
     && apt clean \
     && rm -rf /var/lib/apt/lists/*
 
 # ---- Build LuisaRender -----------------------------------
-COPY --chown=ubuntu:ubuntu libs/Genesis /Genesis
-RUN cd /Genesis \
-    && sh ./scripts/build_luisa.sh $(python3 -V | cut -d" " -f2 | cut -d. -f1-2)
+USER ubuntu
+COPY --chown=ubuntu:ubuntu libs/Genesis /tmp/Genesis
+COPY --chown=ubuntu:ubuntu libs/build_luisa.sh /tmp/
+RUN sh /tmp/build_luisa.sh $(python3 -V | cut -d" " -f2 | cut -d. -f1-2)
 
 
 ############################################################
@@ -145,6 +145,7 @@ RUN mkdir -p /workspace  \
 
 # ---- set entrypoint script -------------------------------
 RUN echo "#!/bin/bash\n\
+set -e\n\
 \n\
 chown ${USER_NAME}:${GROUP_NAME} -R /workspace\n\
 \n\

@@ -109,8 +109,8 @@ RUN pip install PyOpenGL==3.1.5 \
     && rm -rf /tmp/Genesis
 
 # ---- Install Genesis dependencies ------------------------
-COPY --from=builder /Genesis/genesis/ext/ParticleMesher/ParticleMesherPy /home/genesis/.local/lib/python3.12/site-packages/genesis/ext/ParticleMesher/ParticleMesherPy
-COPY --from=builder /Genesis/genesis/ext/LuisaRender/build/bin /home/genesis/.local/lib/python3.12/site-packages/genesis/ext/LuisaRender/build/bin
+COPY --from=builder /tmp/Genesis/genesis/ext/ParticleMesher/ParticleMesherPy /home/genesis/.local/lib/python3.12/site-packages/genesis/ext/ParticleMesher/ParticleMesherPy
+COPY --from=builder /tmp/Genesis/genesis/ext/LuisaRender/build/bin /home/genesis/.local/lib/python3.12/site-packages/genesis/ext/LuisaRender/build/bin
 
 # ---- Setup ROS dependencies ------------------------------
 USER root
